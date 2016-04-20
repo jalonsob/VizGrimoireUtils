@@ -1,0 +1,18 @@
+[config]
+
+machines = machine1,machine2
+
+machine1_connection = <user>@machine1.com
+machine1_log_from = <path>
+
+machine2_connection = <user>@machine2.com
+machine2_log_from = <path>
+
+# optional parameters to send notification mail
+# if no email_to is set, it won't send mail
+email_from = <user>@<service>.com
+email_to = <user>@<service>.com
+
+# optional parameters to make a file with
+# the report of our data bases
+log_files = <path>
