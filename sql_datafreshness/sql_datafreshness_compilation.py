@@ -33,19 +33,19 @@ from email.mime.text import MIMEText
 import smtplib
 
 class Record_machine(object):
-    __slots__= "name","connection", "log_from",
+    __slots__ = "name", "connection", "log_from"
 
     def items(self):
         "dict style items"
         return [
             (field_name, getattr(self, field_name))
             for field_name in self.__slots__]
-    def __set__(self,attr,value):
-	"set a value in an item"
-	setattr(self, attr,value)
+    def __set__(self, attr, value):
+        "set a value in an item"
+        setattr(self, attr, value)
     def getattrs(self):
-	"get the list of attrs"
-	return self.__slots__
+        "get the list of attrs"
+        return self.__slots__
     def __iter__(self):
         "iterate over fields tuple/list style"
         for field_name in self.__slots__:
@@ -56,89 +56,89 @@ class Record_machine(object):
 
 
 def get_args():
-	parser = ArgumentParser(usage='Usage: %(prog)s [options]',
-		            description='Checks data freshness log of SQL databases in all machines and made a new mail',
-		            version='0.1')
-	parser.add_argument('-g','--debug', dest='debug',
-		help='Debug mode, disabled by default',
-		required=False, action='store_true')
-	parser.add_argument('--conf', dest='config_file',
-		help='Configuration file',
-		required=False)
-	parser.add_argument('-s','--send', dest='send',
-		help='Sends the information to the mail. Disabled by default.',
-		required=False,action='store_true')
-	parser.add_argument('-f','--file', dest='file',
-		        help='Generates a file with the content of the report.',
-		        required=False,action='store_true')
-	args = parser.parse_args()
+    parser = ArgumentParser(usage='Usage: %(prog)s [options]',
+            description='Checks data freshness log of SQL databases in all machines and made a new mail',
+            version='0.1')
+    parser.add_argument('-g', '--debug', dest='debug',
+            help='Debug mode, disabled by default',
+            required=False, action='store_true')
+    parser.add_argument('--conf', dest='config_file',
+            help='Configuration file',
+            required=False)
+    parser.add_argument('-s', '--send', dest='send',
+            help='Sends the information to the mail. Disabled by default.',
+            required=False, action='store_true')
+    parser.add_argument('-f', '--file', dest='file',
+                    help='Generates a file with the content of the report.',
+                    required=False, action='store_true')
+    args = parser.parse_args()
 
-	if len(sys.argv)==1:
-		parser.print_help()
-		sys.exit(1)
+    if len(sys.argv) == 1:
+        parser.print_help()
+        sys.exit(1)
 
-    	return args
+    return args
 
 def read_conf(file_path):
 
-	Config = ConfigParser.ConfigParser()
-	Config.read(file_path)
+    Config = ConfigParser.ConfigParser()
+    Config.read(file_path)
 
-	machines=[]
-	config_machines=[]
-	opts={}
+    machines=[]
+    config_machines=[]
+    opts={}
 
-	str_machines_option =Config.get("config","machines")
-	machines=str_machines_option.split(',')
-	for machine in machines:
-		r=Record_machine()
-		for attribute in r.getattrs():
-			if attribute=="name":
-				r.name=machine
-			else:
-				r.__set__(attribute,Config.get("config",machine+"_"+attribute))
-		config_machines.append(r)
-	
-	try:
-       		opts['email_from'] = Config.get('config','email_from')
-	except:
-		opts['email_from'] = ''
-	try:
-		opts['email_to'] = Config.get('config','email_to')
-	except:
-		opts['email_to'] = ''
-	try:
-		opts['log_files'] = Config.get('config','log_files')
-	except:
-		opts['log_files'] = ''
+    str_machines_option =Config.get("config", "machines")
+    machines=str_machines_option.split(',')
+    for machine in machines:
+        r=Record_machine()
+        for attribute in r.getattrs():
+            if attribute=="name":
+                r.name=machine
+            else:
+                r.__set__(attribute,Config.get("config", machine+"_"+attribute))
+        config_machines.append(r)
 
-	return config_machines,opts
+    try:
+        opts['email_from'] = Config.get('config', 'email_from')
+    except:
+        opts['email_from'] = ''
+    try:
+        opts['email_to'] = Config.get('config', 'email_to')
+    except:
+        opts['email_to'] = ''
+    try:
+        opts['log_files'] = Config.get('config', 'log_files')
+    except:
+        opts['log_files'] = ''
+
+    return config_machines,opts
 
 def scp_logs(machines,opts):
 
-	for machine in machines:
-		try:
-			logging.debug('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log')
-			subprocess.check_call('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',shell=True)
-		except:
-			logging.debug("created "+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log')
-			target = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log','w')
-			target.write("---THERE IS NO DATA FOR TODAY---\n")
-			target.close()	
+    for machine in machines:
+        try:
+            logging.debug('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log')
+            subprocess.check_call('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',shell=True)
+        except:
+            logging.debug("created "+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log')
+            target = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log','w')
+            target.write("---THERE IS NO DATA FOR TODAY---\n")
+            target.close()
 
 def compile_logs(machines,opts):
-	
-	body=''
-	for machine in machines:
-		try:
-			f = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',"r")
-			new_str = f.read()
-			new_str= '****'+machine.name+'****\n\n'+new_str+'\n'
-			body=body+new_str
-		except:
-			logging.debug("ERROR READING : "+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',"r")
-			
-	return body
+
+    body=''
+    for machine in machines:
+        try:
+            f = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',"r")
+            new_str = f.read()
+            new_str= '****'+machine.name+'****\n\n'+new_str+'\n'
+            body=body+new_str
+        except:
+            logging.debug("ERROR READING : "+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',"r")
+
+    return body
 
 def send_mail(text, subject, msg_from, msg_to):
     msg = MIMEMultipart('alternative')
@@ -155,25 +155,23 @@ def send_mail(text, subject, msg_from, msg_to):
     s.quit()
 
 def send(body,opts):
-	msg_subject = 'SQL Data smells compilation '
-	send_mail(body, msg_subject,opts['email_from'], opts['email_to'])
-	logging.debug("Mail sent to %s" % (opts['email_to']))
+    msg_subject = 'SQL Data smells compilation '
+    send_mail(body, msg_subject,opts['email_from'], opts['email_to'])
+    logging.debug("Mail sent to %s" % (opts['email_to']))
 
 def create_file_compilation(body,opts):
 
-	target = open(opts['log_files']+time.strftime("%Y%m%d")+'.log','w')
-	target.write(body)
-	target.close()	
+    target = open(opts['log_files']+time.strftime("%Y%m%d")+'.log','w')
+    target.write(body)
+    target.close()
 
 if __name__ == '__main__':
 
-	args = get_args()
-	machines,opts=read_conf(args.config_file)
-	scp_logs(machines,opts)
-	body=compile_logs(machines,opts)
-	if args.send:
-		send(body,opts)
-	if args.file:
-		create_file_compilation(body,opts)
-
-
+    args = get_args()
+    machines,opts=read_conf(args.config_file)
+    scp_logs(machines,opts)
+    body=compile_logs(machines,opts)
+    if args.send:
+        send(body,opts)
+    if args.file:
+        create_file_compilation(body,opts)
