@@ -101,16 +101,21 @@ def read_conf(file_path):
 
     try:
         opts['email_from'] = Config.get('config', 'email_from')
-    except:
-        opts['email_from'] = ''
+    except ConfigParser.NoOptionError:
+        myhost = os.uname()[1]
+        opts['email_from'] = myhost
+	logging.debug("There is no email_from specify. 'myhost' used by default.")
+    
     try:
         opts['email_to'] = Config.get('config', 'email_to')
-    except:
+    except ConfigParser.NoOptionError:
         opts['email_to'] = ''
+
     try:
         opts['log_files'] = Config.get('config', 'log_files')
-    except:
-        opts['log_files'] = ''
+    except ConfigParser.NoOptionError:
+        opts['log_files'] = os.getcwd()
+	logging.debug("There is no path specify for logs. Actual path used by default.")
 
     return config_machines,opts
 
@@ -118,11 +123,15 @@ def scp_logs(machines,opts):
 
     for machine in machines:
         try:
-            logging.debug('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log')
-            subprocess.check_call('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',shell=True)
+            logging.debug('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+'/'+machine.name+'.log.'+time.strftime("%Y%m%d"))
+            subprocess.check_call('rsync -a '+machine.connection+':'+machine.log_from+'.'+time.strftime("%Y%m%d")+' '+opts['log_files']+'/'+machine.name+'.log.'+time.strftime("%Y%m%d"),shell=True)
         except:
-            logging.debug("created "+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log')
-            target = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log','w')
+            if opts['log_files'] == os.getcwd():
+                logging.debug("created "+machine.name+'.log.'+time.strftime("%Y%m%d"))
+                target = open(opts['log_files']+'/'+machine.name+'.log.'+time.strftime("%Y%m%d"),'w')
+            else:
+                logging.debug("created "+opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log')
+                target = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log','w')
             target.write("---THERE IS NO DATA FOR TODAY---\n")
             target.close()
 
@@ -131,7 +140,10 @@ def compile_logs(machines,opts):
     body=''
     for machine in machines:
         try:
-            f = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',"r")
+            if opts['log_files'] == os.getcwd():
+                f = open(opts['log_files']+'/'+machine.name+'.log.'+time.strftime("%Y%m%d"),"r")
+            else:
+                f = open(opts['log_files']+machine.name+'/'+time.strftime("%Y%m%d")+'.log',"r")
             new_str = f.read()
             new_str= '****'+machine.name+'****\n\n'+new_str+'\n'
             body=body+new_str
@@ -155,13 +167,15 @@ def send_mail(text, subject, msg_from, msg_to):
     s.quit()
 
 def send(body,opts):
-    msg_subject = 'SQL Data smells compilation '
-    send_mail(body, msg_subject,opts['email_from'], opts['email_to'])
-    logging.debug("Mail sent to %s" % (opts['email_to']))
+    if len(opts['email_to'])>0:
+        msg_subject = 'SQL Data smells compilation '
+        send_mail(body, msg_subject,opts['email_from'], opts['email_to'])
+        logging.debug("Mail sent to %s" % (opts['email_to']))
+    else:
+        logging.debug("There is no destiny email to send.")
 
 def create_file_compilation(body,opts):
-
-    target = open(opts['log_files']+time.strftime("%Y%m%d")+'.log','w')
+    target = open(opts['log_files']+'/'+time.strftime("%Y%m%d")+'.log','w')
     target.write(body)
     target.close()
 
